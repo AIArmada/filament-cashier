@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AIArmada\FilamentCashier\CustomerPortal\Pages;
 
+use AIArmada\FilamentCashier\Support\CurrencyFormatter;
 use AIArmada\FilamentCashier\Support\GatewayDetector;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -50,14 +51,17 @@ final class ViewInvoices extends Page
                 $stripeInvoices = $user->invoices();
 
                 foreach ($stripeInvoices as $invoice) {
+                    $invoiceDate = $invoice->date();
+
                     $invoices->push([
                         'id' => $invoice->id,
                         'gateway' => 'stripe',
                         'number' => $invoice->number ?? $invoice->id,
                         'amount' => $invoice->total(),
-                        'date' => $invoice->date()->format('M d, Y'),
+                        'date' => $invoiceDate->format('M d, Y'),
                         'status' => $invoice->paid ? 'paid' : 'open',
                         'download_url' => $invoice->invoicePdf(),
+                        'sort_timestamp' => $invoiceDate->timestamp,
                     ]);
                 }
             } catch (Throwable $e) {
@@ -71,14 +75,18 @@ final class ViewInvoices extends Page
                 $chipInvoices = $user->chipInvoices();
 
                 foreach ($chipInvoices as $invoice) {
+                    $createdAt = $invoice->created_at;
+                    $currency = (string) ($invoice->currency ?? config('cashier.currency', 'MYR'));
+
                     $invoices->push([
                         'id' => $invoice->id,
                         'gateway' => 'chip',
                         'number' => $invoice->number ?? $invoice->id,
-                        'amount' => $this->formatAmount(($invoice->amount ?? 0), 'MYR'),
-                        'date' => $invoice->created_at?->format('M d, Y') ?? 'N/A',
+                        'amount' => CurrencyFormatter::format((int) ($invoice->amount ?? 0), $currency),
+                        'date' => $createdAt?->format('M d, Y') ?? 'N/A',
                         'status' => $invoice->status ?? 'unknown',
                         'download_url' => $invoice->pdf_url ?? null,
+                        'sort_timestamp' => $createdAt?->timestamp ?? 0,
                     ]);
                 }
             } catch (Throwable $e) {
@@ -86,19 +94,16 @@ final class ViewInvoices extends Page
             }
         }
 
-        return $invoices->sortByDesc('date')->values();
-    }
+        /** @var Collection<int, array{id: string, gateway: string, number: string, amount: string, date: string, status: string, download_url: string|null}> $result */
+        $result = $invoices
+            ->sortByDesc('sort_timestamp')
+            ->values()
+            ->map(function (array $invoice): array {
+                unset($invoice['sort_timestamp']);
 
-    private function formatAmount(int $amountInCents, string $currency): string
-    {
-        $symbol = match ($currency) {
-            'MYR' => 'RM',
-            'USD' => '$',
-            'EUR' => '€',
-            'GBP' => '£',
-            default => $currency . ' ',
-        };
+                return $invoice;
+            });
 
-        return $symbol . number_format($amountInCents / 100, 2);
+        return $result;
     }
 }

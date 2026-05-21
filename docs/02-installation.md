@@ -67,7 +67,7 @@ php artisan migrate
 
 ## Step 6: Configure Model
 
-Add the `Billable` trait to your User model:
+Add the `Billable` trait to your User model (or any billable model):
 
 ```php
 <?php
@@ -83,6 +83,50 @@ class User extends Authenticatable
     
     // ...
 }
+```
+
+### Understanding the Billable Contract
+
+The `Billable` trait implements `AIArmada\Cashier\Contracts\BillableContract`, which provides a unified interface for multi-gateway billing operations. This contract includes:
+
+#### Bridge API (Gateway-Agnostic)
+These methods work consistently across all installed gateways:
+
+- **Gateway Management**: `preferredGateway()`, `setPreferredGateway()`
+- **Customer Management**: `createOrGetCustomer()`, `updateCustomer()`, `syncCustomer()`
+- **Charging**: `chargeWithGateway($gateway, ...)`
+- **Subscriptions**: `newGatewaySubscription($gateway, ...)`, `allGatewaySubscriptions()`, `subscribedViaGateway($gateway)`
+- **Payment Methods**: `allGatewayPaymentMethods()`, `defaultGatewayPaymentMethod()`
+- **Invoices**: `allGatewayInvoices()`, `gatewayBillingPortalUrl($gateway)`
+
+#### Gateway-Native Hooks (Optional)
+For advanced use cases, gateway implementations may call optional native methods on your billable model:
+
+- **Stripe**: `createOrGetStripeCustomer()`, `syncStripeCustomerDetails()`
+- **CHIP**: `createOrGetChipCustomer()`
+
+These are accessed through gateway adapters, not directly on the billable interface.
+
+### Multi-Gateway Usage
+
+Once configured, you can use any installed gateway:
+
+```php
+$user = User::first();
+
+// Use default gateway
+$subscription = $user->newGatewaySubscription($user->preferredGateway(), 'price_123');
+
+// Switch to a different gateway
+$user->setPreferredGateway('chip');
+$subscription = $user->newGatewaySubscription('chip', 'plan-id');
+
+// Access all subscriptions across all gateways
+$allSubscriptions = $user->allGatewaySubscriptions();
+
+// Get payment methods from a specific gateway
+$stripeMethods = $user->gatewayPaymentMethods('stripe');
+$chipMethods = $user->gatewayPaymentMethods('chip');
 ```
 
 ## Step 7: Register the Plugin
@@ -127,8 +171,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 ```env
 CHIP_BRAND_ID=your_brand_id
-CHIP_API_KEY=your_api_key
-CHIP_WEBHOOK_KEY=your_webhook_key
+CHIP_COLLECT_API_KEY=your_api_key
+CHIP_WEBHOOK_SECRET=your_webhook_secret
 ```
 
 ### Default Gateway
