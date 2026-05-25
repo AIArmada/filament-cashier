@@ -28,6 +28,7 @@ final class GatewayManagement extends Page
 
     protected static ?int $navigationSort = 50;
 
+    /** @var view-string */
     protected string $view = 'filament-cashier::pages.gateway-management';
 
     public static function getNavigationLabel(): string
@@ -45,7 +46,7 @@ final class GatewayManagement extends Page
         return __('filament-cashier::gateway.management.title');
     }
 
-    public function getMaxContentWidth(): Width | string | null
+    public function getMaxContentWidth(): Width
     {
         return Width::Full;
     }
@@ -58,14 +59,14 @@ final class GatewayManagement extends Page
     /**
      * Get gateway health status.
      *
-     * @return Collection<int, array{gateway: string, label: string, color: string, icon: string, status: string, statusColor: string, lastCheck: string|null, message: string|null}>
+     * @return Collection<int, array{gateway: string, label: string, color: string, icon: string, status: string, statusColor: string, lastCheck: string, message: string|null}>
      */
     public function getGatewayHealth(): Collection
     {
         $detector = $this->getGatewayDetector();
         $gateways = $detector->availableGateways();
 
-        return collect($gateways)->map(function (string $gateway) use ($detector) {
+        $health = collect($gateways)->map(function (string $gateway) use ($detector) {
             $health = $this->checkGatewayHealth($gateway);
 
             return [
@@ -78,7 +79,10 @@ final class GatewayManagement extends Page
                 'lastCheck' => now()->format('Y-m-d H:i:s'),
                 'message' => $health['message'],
             ];
-        });
+        })->values();
+
+        // @phpstan-ignore-next-line Collection covariance false positive with exact array shape.
+        return $health;
     }
 
     /**
