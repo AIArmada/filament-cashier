@@ -25,10 +25,15 @@ The subscription list shows:
 
 ### Filtering Subscriptions
 
-The table exposes two `SelectFilter`s (not tabs):
+Use the tabs to filter by:
+- **All** - All subscriptions
+- **Stripe** / **CHIP** - Filter by gateway
+- **Active** - Only active subscriptions
+- **Needs Attention** - Past due or incomplete
 
-- **Gateway** — any detected gateway (e.g. `stripe`, `chip`)
-- **Status** — every `SubscriptionStatus` case
+Use the dropdown filters for:
+- Gateway
+- Status (Active, On Trial, Past Due, Canceled, etc.)
 
 ### Subscription Actions
 
@@ -43,7 +48,7 @@ On each subscription row:
 
 ### Creating Subscriptions
 
-Click **Create Subscription** and follow the wizard:
+Click **Create Subscription** and fill in the form:
 
 1. **Customer** - Select the user
 2. **Gateway** - Choose Stripe or CHIP
@@ -63,10 +68,10 @@ The unified invoices resource is list-first: it aggregates invoice records acros
 
 ### Scoping Notes
 
-- The admin subscription and invoice lists delegate to the per-billable
-  gateway clients, so they show the signed-in staff member's own records —
-  not an owner-wide view. An owner-wide admin list needs gateway support that
-  does not exist yet.
+- The admin subscription list queries the gateway subscription models
+  directly through `OwnerScopedQuery`, so staff see every billable's
+  subscriptions in the current owner scope. The invoice list is per-billable:
+  it loads invoices through the signed-in staff member's own gateway clients.
 - The customer portal shows the signed-in customer's records only.
 - Gateway health probes are cached per owner for 60 seconds. Probe failures
   surface a generic message; details go to the log.
@@ -101,15 +106,15 @@ Shows monthly cancellations with trend indicator.
 
 ### Enabling the Portal
 
-1. Configure the portal:
+1. Enable in config:
 ```php
 'billing_portal' => [
+    'enabled' => true,
     'path' => 'billing',
 ],
 ```
 
-2. Register the panel provider — registration is what makes the portal exist;
-   there is no `enabled` flag:
+2. Register the panel provider:
 ```php
 // config/app.php
 'providers' => [
@@ -136,7 +141,7 @@ The overview page can surface three customer-facing preview widgets:
 - `PaymentMethodsPreviewWidget`
 - `RecentInvoicesWidget`
 
-These widgets only show records for the authenticated user and rely on `AIArmada\Cashier\Support\OwnerScopedQuery` plus the current auth identifier when loading Stripe and CHIP data.
+These widgets only show records for the authenticated user and rely on `OwnerScopedQuery` plus the current auth identifier when loading Stripe and CHIP data.
 
 ### Manage Subscriptions Behavior
 
@@ -187,9 +192,6 @@ FilamentCashierPlugin::make()
 ## Customization
 
 ### Custom Gateway Labels
-
-Gateway labels, icons, colors, and dashboard URLs are read from the core
-`cashier` config, not from `filament-cashier`:
 
 ```php
 // config/cashier.php
